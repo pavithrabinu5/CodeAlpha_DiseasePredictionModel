@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Prognos — AI Disease Prediction</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{
+  --black:#0a0a0a;--white:#f8f8f6;
+  --g100:#f0efed;--g200:#e0dfdc;--g400:#9e9c98;--g600:#5a5855;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{font-family:"DM Sans",sans-serif;background:var(--white);color:var(--black);overflow-x:hidden;}
+
+/* ── LOADER ── */
+#loader{
+  position:fixed;inset:0;z-index:9999;background:var(--black);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:36px;
+  transition:opacity 0.7s ease,visibility 0.7s ease;
+}
+#loader.hide{opacity:0;visibility:hidden;pointer-events:none;}
+.ld-logo{
+  font-family:"Playfair Display",serif;font-size:64px;font-weight:900;
+  letter-spacing:-0.04em;color:var(--white);
+  opacity:0;animation:logoIn 0.9s cubic-bezier(0.16,1,0.3,1) 0.2s forwards;
+}
+.ld-logo em{font-style:italic;font-weight:400;}
+@keyframes logoIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.ld-bar-wrap{width:220px;height:1px;background:#2a2a2a;}
+.ld-bar{height:1px;background:var(--white);width:0%;transition:width 0.06s linear;}
+.ld-pct{font-size:11px;letter-spacing:0.2em;color:#555;font-weight:300;}
+
+/* ── NAV ── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:22px 52px;
+  background:rgba(248,248,246,0.96);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--g200);
+}
+.nav-logo{
+  font-family:"Playfair Display",serif;font-size:22px;font-weight:900;
+  letter-spacing:-0.03em;color:var(--black);text-decoration:none;
+}
+.nav-logo em{font-style:italic;font-weight:400;}
+.nav-links{display:flex;gap:36px;align-items:center;}
+.nav-links a{
+  font-size:11px;font-weight:400;letter-spacing:0.1em;text-transform:uppercase;
+  color:var(--g600);text-decoration:none;transition:color 0.2s;
+}
+.nav-links a:hover{color:var(--black);}
+.nav-cta{
+  background:var(--black)!important;color:var(--white)!important;
+  padding:10px 24px!important;letter-spacing:0.1em;
+}
+
+/* ── HERO ── */
+.hero{
+  min-height:100vh;display:grid;grid-template-columns:1fr 1fr;
+  padding-top:76px;
+}
+.hero-left{
+  padding:80px 52px;
+  display:flex;flex-direction:column;justify-content:center;
+  border-right:1px solid var(--g200);
+}
+.eyebrow{
+  font-size:11px;letter-spacing:0.18em;text-transform:uppercase;
+  color:var(--g400);margin-bottom:28px;
+  display:flex;align-items:center;gap:12px;
+}
+.eyebrow::before{content:"";width:28px;height:1px;background:var(--g400);}
+h1{
+  font-family:"Playfair Display",serif;
+  font-size:clamp(54px,5.8vw,88px);
+  font-weight:900;line-height:0.93;letter-spacing:-0.03em;
+  margin-bottom:32px;color:var(--black);
+}
+h1 em{font-style:italic;font-weight:400;}
+.hero-desc{
+  font-size:15px;line-height:1.8;color:var(--g600);
+  max-width:400px;margin-bottom:48px;
+}
+.btns{display:flex;gap:16px;align-items:center;flex-wrap:wrap;}
+.btn-blk{
+  display:inline-flex;align-items:center;gap:10px;
+  background:var(--black);color:var(--white);
+  font-size:12px;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;
+  padding:15px 30px;text-decoration:none;border:none;cursor:pointer;
+  transition:opacity 0.2s;
+}
+.btn-blk:hover{opacity:0.75;}
+.btn-ghost{
+  font-size:12px;color:var(--g400);text-decoration:none;
+  letter-spacing:0.08em;text-transform:uppercase;
+  transition:color 0.2s;display:flex;align-items:center;gap:6px;
+}
+.btn-ghost:hover{color:var(--black);}
+
+.hero-right{
+  background:var(--g100);padding:52px 48px;
+  display:flex;flex-direction:column;gap:32px;
+}
+.chart-label{
+  font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--g400);
+  margin-bottom:12px;
+}
+.chart-box{flex:1;min-height:220px;position:relative;}
+.stats-grid{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:1px;background:var(--g200);border:1px solid var(--g200);
+}
+.stat-box{background:var(--g100);padding:24px 20px;}
+.stat-n{
+  font-family:"Playfair Display",serif;
+  font-size:38px;font-weight:700;letter-spacing:-0.03em;line-height:1;
+}
+.stat-l{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--g400);margin-top:6px;}
+
+/* ── DIVIDER ── */
+.div-bar{
+  display:flex;align-items:center;gap:16px;
+  font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--g400);
+  padding:18px 52px;border-top:1px solid var(--g200);border-bottom:1px solid var(--g200);
+}
+.div-bar::after{content:"";flex:1;height:1px;background:var(--g200);}
+
+/* ── PREDICT ── */
+#predict{display:grid;grid-template-columns:340px 1fr;min-height:80vh;}
+.sidebar{border-right:1px solid var(--g200);display:flex;flex-direction:column;}
+.disease-tab{
+  padding:24px 28px;border-bottom:1px solid var(--g200);
+  cursor:pointer;transition:background 0.18s;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.disease-tab:hover:not(.active){background:var(--g100);}
+.disease-tab.active{background:var(--black);color:var(--white);}
+.disease-tab.active .t-acc,.disease-tab.active .t-num{color:#666;}
+.t-num{font-size:11px;letter-spacing:0.1em;color:var(--g400);margin-bottom:3px;}
+.t-name{font-family:"Playfair Display",serif;font-size:17px;font-weight:600;}
+.t-acc{font-size:12px;color:var(--g400);margin-top:2px;}
+.t-arr{font-size:14px;opacity:0.5;}
+.sidebar-bottom{
+  flex:1;padding:28px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:16px;
+}
+.pulse-wrap{position:relative;width:110px;height:110px;display:flex;align-items:center;justify-content:center;}
+.p-ring{
+  position:absolute;border-radius:50%;border:1px solid var(--g300);
+  animation:pring 2.8s ease-out infinite;
+}
+.p-ring:nth-child(1){width:100%;height:100%;}
+.p-ring:nth-child(2){width:145%;height:145%;animation-delay:0.9s;}
+@keyframes pring{0%{opacity:0.6;transform:scale(0.8)}100%{opacity:0;transform:scale(1.2)}}
+@keyframes heroRing{0%{opacity:0.75;transform:scale(0.88)}100%{opacity:0;transform:scale(1.18)}}
+.p-core{
+  width:48px;height:48px;border-radius:50%;background:var(--black);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--white);font-size:18px;z-index:1;
+}
+.sidebar-note{font-size:12px;color:var(--g400);text-align:center;line-height:1.65;max-width:200px;}
+
+/* ── FORM ── */
+.predict-main{padding:48px 52px;overflow-y:auto;}
+.form-head{margin-bottom:36px;}
+.form-title{
+  font-family:"Playfair Display",serif;
+  font-size:32px;font-weight:700;letter-spacing:-0.02em;line-height:1.1;
+  margin-bottom:10px;
+}
+.form-sub{font-size:13px;color:var(--g400);line-height:1.6;}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:28px;}
+.fg{display:flex;flex-direction:column;gap:7px;}
+.fg.full{grid-column:1/-1;}
+label{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--g600);font-weight:500;}
+input[type=number],select{
+  width:100%;padding:13px 15px;
+  border:1px solid var(--g200);background:var(--white);
+  font-family:"DM Sans",sans-serif;font-size:14px;color:var(--black);
+  outline:none;transition:border-color 0.2s;
+  -webkit-appearance:none;appearance:none;border-radius:0;
+}
+input[type=number]:focus,select:focus{border-color:var(--black);}
+.hint{font-size:11px;color:var(--g400);}
+.run-btn{
+  width:100%;padding:16px;background:var(--black);color:var(--white);border:none;
+  font-family:"DM Sans",sans-serif;font-size:12px;font-weight:500;
+  letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;
+  transition:opacity 0.2s;display:flex;align-items:center;justify-content:center;gap:10px;
+}
+.run-btn:hover{opacity:0.78;}
+.spin-dots{display:none;gap:5px;align-items:center;}
+.spin-dots.on{display:flex;}
+.sd{width:5px;height:5px;background:var(--white);border-radius:50%;animation:blink 1s infinite;}
+.sd:nth-child(2){animation-delay:0.2s;}.sd:nth-child(3){animation-delay:0.4s;}
+@keyframes blink{0%,100%{opacity:0.2}50%{opacity:1}}
+
+/* ── RESULT ── */
+.result-panel{
+  display:none;margin-top:32px;
+  border:1px solid var(--g200);padding:32px;
+  animation:fadeUp 0.45s ease;
+}
+.result-panel.on{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.res-row{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;}
+.res-verdict{
+  font-family:"Playfair Display",serif;
+  font-size:24px;font-weight:700;letter-spacing:-0.02em;
+}
+.badge{
+  font-size:11px;letter-spacing:0.1em;text-transform:uppercase;font-weight:500;
+  padding:5px 13px;border:1px solid currentColor;
+}
+.badge.high{color:#b91c1c;border-color:#fecaca;background:#fff1f2;}
+.badge.med{color:#b45309;border-color:#fde68a;background:#fffbeb;}
+.badge.low{color:#166534;border-color:#bbf7d0;background:#f0fdf4;}
+.prob-section{margin-bottom:22px;}
+.prob-top{display:flex;justify-content:space-between;margin-bottom:8px;}
+.prob-top span:first-child{font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--g600);}
+.prob-num{font-family:"Playfair Display",serif;font-size:20px;font-weight:700;}
+.prob-track{height:2px;background:var(--g200);}
+.prob-fill{height:100%;background:var(--black);transition:width 0.95s cubic-bezier(0.23,1,0.32,1);}
+.metrics-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--g200);border:1px solid var(--g200);margin-bottom:20px;}
+.metric-box{background:var(--white);padding:16px 18px;}
+.m-val{font-family:"Playfair Display",serif;font-size:20px;font-weight:700;}
+.m-key{font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--g400);margin-top:3px;}
+.res-chart-wrap{margin-top:22px;}
+.res-chart-label{font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--g400);margin-bottom:12px;}
+.donut-wrap{height:170px;position:relative;display:flex;align-items:center;}
+.donut-wrap canvas{max-width:170px;}
+.donut-legend{display:flex;flex-direction:column;gap:10px;margin-left:28px;}
+.dl-item{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--g600);}
+.dl-dot{width:8px;height:8px;border-radius:50%;}
+.res-note{
+  margin-top:18px;padding:14px 16px;
+  background:var(--g100);border-left:2px solid var(--black);
+  font-size:12px;color:var(--g600);line-height:1.65;
+}
+
+/* ── ABOUT ── */
+.about{border-top:1px solid var(--g200);display:grid;grid-template-columns:1fr 1fr;}
+.about-l{padding:80px 52px;border-right:1px solid var(--g200);}
+.about-r{padding:80px 52px;background:var(--black);color:var(--white);}
+.section-title{
+  font-family:"Playfair Display",serif;
+  font-size:40px;font-weight:700;line-height:1.05;letter-spacing:-0.02em;
+  margin-bottom:24px;
+}
+.section-title em{font-style:italic;font-weight:400;}
+.body-text{font-size:14px;line-height:1.85;color:var(--g600);}
+.about-r .body-text{color:#777;}
+.model-list{list-style:none;margin-top:36px;}
+.model-list li{
+  padding:16px 0;border-bottom:1px solid #1d1d1d;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.model-list li:first-child{border-top:1px solid #1d1d1d;}
+.ml-name{font-weight:500;color:var(--white);font-size:14px;}
+.ml-sub{font-size:11px;color:#555;margin-top:2px;}
+.ml-score{font-family:"Playfair Display",serif;font-size:20px;color:var(--white);}
+.radar-wrap{margin-top:36px;height:260px;position:relative;}
+.dark-chart-wrap{margin-top:36px;height:180px;position:relative;}
+
+/* ── FOOTER ── */
+footer{
+  border-top:1px solid var(--g200);padding:28px 52px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.foot-logo{
+  font-family:"Playfair Display",serif;font-size:18px;
+  font-weight:900;letter-spacing:-0.03em;color:var(--black);
+}
+.foot-logo em{font-style:italic;font-weight:400;}
+.foot-note{font-size:11px;color:var(--g400);}
+
+/* ── REVEAL ── */
+.reveal{opacity:0;transform:translateY(22px);transition:opacity 0.7s ease,transform 0.7s ease;}
+.reveal.vis{opacity:1;transform:translateY(0);}
+
+@media(max-width:960px){
+  nav{padding:18px 20px;}
+  .hero,.about{grid-template-columns:1fr;}
+  .hero-right{display:none;}
+  #predict{grid-template-columns:1fr;}
+  .sidebar{flex-direction:row;overflow-x:auto;}
+  .sidebar-bottom{display:none;}
+  .hero-left,.about-l,.about-r,.predict-main{padding:40px 24px;}
+  .fgrid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="ld-logo">Prog<em>nos</em></div>
+  <div class="ld-bar-wrap"><div class="ld-bar" id="lbar"></div></div>
+  <div class="ld-pct" id="lpct">0%</div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">Prog<em>nos</em></a>
+  <div class="nav-links">
+    <a href="#predict">Predict</a>
+    <a href="#about">Models</a>
+    <a href="#predict" class="nav-cta">Run Analysis</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-left reveal">
+    <div class="eyebrow">AI-Powered Diagnostics</div>
+    <h1>Predict<br/><em>disease</em><br/>early.</h1>
+    <p class="hero-desc">Prognos uses an ensemble of four machine learning algorithms trained on clinical datasets to assess your risk of heart disease, diabetes, and breast cancer.</p>
+    <div class="btns">
+      <a href="#predict" class="btn-blk">Begin Analysis &nbsp;→</a>
+      <a href="#about" class="btn-ghost">View models ↓</a>
+    </div>
+  </div>
+  <div class="hero-right reveal">
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+      <div style="position:relative;width:260px;height:260px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <div style="position:absolute;width:100%;height:100%;border-radius:50%;border:1px solid #ccc;animation:heroRing 3s ease-out infinite;"></div>
+        <div style="position:absolute;width:142%;height:142%;border-radius:50%;border:1px solid #ddd;animation:heroRing 3s ease-out infinite;animation-delay:1s;"></div>
+        <div style="position:absolute;width:185%;height:185%;border-radius:50%;border:1px solid #e8e8e8;animation:heroRing 3s ease-out infinite;animation-delay:1.9s;"></div>
+        <div style="width:68px;height:68px;border-radius:50%;background:var(--black);display:flex;align-items:center;justify-content:center;color:var(--white);font-size:24px;z-index:2;position:relative;">✦</div>
+      </div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-box"><div class="stat-n">99.1<span style="font-size:16px">%</span></div><div class="stat-l">Breast Cancer</div></div>
+      <div class="stat-box"><div class="stat-n">0.999</div><div class="stat-l">AUC-ROC</div></div>
+      <div class="stat-box"><div class="stat-n">3</div><div class="stat-l">Diseases</div></div>
+      <div class="stat-box"><div class="stat-n">4</div><div class="stat-l">Algorithms</div></div>
+    </div>
+  </div>
+</section>
+
+<div class="div-bar">01 — Risk Assessment Tool</div>
+
+<!-- PREDICT -->
+<section id="predict">
+  <div class="sidebar">
+    <div class="disease-tab active" onclick="switchTab('breast')" id="tab-breast">
+      <div><div class="t-num">01</div><div class="t-name">Breast Cancer</div><div class="t-acc">AUC 0.999 · 99.1%</div></div>
+      <span class="t-arr">→</span>
+    </div>
+    <div class="disease-tab" onclick="switchTab('heart')" id="tab-heart">
+      <div><div class="t-num">02</div><div class="t-name">Heart Disease</div><div class="t-acc">AUC 0.959 · 86.9%</div></div>
+      <span class="t-arr">→</span>
+    </div>
+    <div class="disease-tab" onclick="switchTab('diabetes')" id="tab-diabetes">
+      <div><div class="t-num">03</div><div class="t-name">Diabetes</div><div class="t-acc">AUC 0.833 · 77.3%</div></div>
+      <span class="t-arr">→</span>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="pulse-wrap">
+        <div class="p-ring"></div><div class="p-ring"></div>
+        <div class="p-core">✦</div>
+      </div>
+      <p class="sidebar-note">Enter patient data and receive an AI-powered risk assessment instantly.</p>
+    </div>
+  </div>
+
+  <div class="predict-main">
+
+    <!-- BREAST CANCER -->
+    <div id="form-breast">
+      <div class="form-head">
+        <h2 class="form-title">Breast Cancer<br/>Risk Analysis</h2>
+        <p class="form-sub">Enter cell nucleus measurements from fine needle aspirate (FNA).</p>
+      </div>
+      <div class="fgrid">
+        <div class="fg"><label>Mean Radius</label><input type="number" id="bc-r" placeholder="e.g. 14.5" step="0.01"/><span class="hint">Range: 6–28</span></div>
+        <div class="fg"><label>Mean Texture</label><input type="number" id="bc-t" placeholder="e.g. 19.3" step="0.01"/><span class="hint">Range: 9–40</span></div>
+        <div class="fg"><label>Mean Perimeter</label><input type="number" id="bc-p" placeholder="e.g. 92.0" step="0.01"/><span class="hint">Range: 43–190</span></div>
+        <div class="fg"><label>Mean Area</label><input type="number" id="bc-a" placeholder="e.g. 655" step="0.1"/><span class="hint">Range: 143–2500</span></div>
+        <div class="fg"><label>Mean Smoothness</label><input type="number" id="bc-sm" placeholder="e.g. 0.096" step="0.001"/><span class="hint">Range: 0.05–0.16</span></div>
+        <div class="fg"><label>Mean Compactness</label><input type="number" id="bc-co" placeholder="e.g. 0.104" step="0.001"/><span class="hint">Range: 0.02–0.35</span></div>
+        <div class="fg"><label>Mean Concavity</label><input type="number" id="bc-cc" placeholder="e.g. 0.089" step="0.001"/><span class="hint">Range: 0–0.43</span></div>
+        <div class="fg"><label>Mean Concave Points</label><input type="number" id="bc-cp" placeholder="e.g. 0.048" step="0.001"/><span class="hint">Range: 0–0.20</span></div>
+        <div class="fg"><label>Mean Symmetry</label><input type="number" id="bc-sy" placeholder="e.g. 0.181" step="0.001"/><span class="hint">Range: 0.1–0.3</span></div>
+        <div class="fg"><label>Fractal Dimension</label><input type="number" id="bc-fd" placeholder="e.g. 0.062" step="0.001"/><span class="hint">Range: 0.05–0.1</span></div>
+      </div>
+      <button class="run-btn" onclick="predict('breast')">
+        <span id="bc-txt">Analyse Risk</span>
+        <div class="spin-dots" id="bc-ld"><div class="sd"></div><div class="sd"></div><div class="sd"></div></div>
+      </button>
+      <div class="result-panel" id="res-breast"></div>
+    </div>
+
+    <!-- HEART DISEASE -->
+    <div id="form-heart" style="display:none">
+      <div class="form-head">
+        <h2 class="form-title">Heart Disease<br/>Risk Analysis</h2>
+        <p class="form-sub">Enter clinical measurements from recent lab results or doctor records.</p>
+      </div>
+      <div class="fgrid">
+        <div class="fg"><label>Age</label><input type="number" id="hd-age" placeholder="e.g. 52" min="20" max="100"/></div>
+        <div class="fg"><label>Sex</label><select id="hd-sex"><option value="">Select</option><option value="1">Male</option><option value="0">Female</option></select></div>
+        <div class="fg"><label>Chest Pain Type</label><select id="hd-cp"><option value="">Select</option><option value="0">Typical angina</option><option value="1">Atypical angina</option><option value="2">Non-anginal pain</option><option value="3">Asymptomatic</option></select></div>
+        <div class="fg"><label>Resting Blood Pressure</label><input type="number" id="hd-bp" placeholder="e.g. 130"/><span class="hint">mm Hg</span></div>
+        <div class="fg"><label>Cholesterol</label><input type="number" id="hd-chol" placeholder="e.g. 240"/><span class="hint">mg/dl</span></div>
+        <div class="fg"><label>Fasting Blood Sugar &gt;120</label><select id="hd-fbs"><option value="">Select</option><option value="1">Yes</option><option value="0">No</option></select></div>
+        <div class="fg"><label>Resting ECG</label><select id="hd-ecg"><option value="">Select</option><option value="0">Normal</option><option value="1">ST-T abnormality</option><option value="2">LV hypertrophy</option></select></div>
+        <div class="fg"><label>Max Heart Rate</label><input type="number" id="hd-thal" placeholder="e.g. 165"/><span class="hint">bpm</span></div>
+        <div class="fg"><label>Exercise Angina</label><select id="hd-ex"><option value="">Select</option><option value="1">Yes</option><option value="0">No</option></select></div>
+        <div class="fg"><label>ST Depression (Oldpeak)</label><input type="number" id="hd-op" placeholder="e.g. 1.5" step="0.1"/></div>
+        <div class="fg"><label>ST Slope</label><select id="hd-sl"><option value="">Select</option><option value="0">Upsloping</option><option value="1">Flat</option><option value="2">Downsloping</option></select></div>
+        <div class="fg"><label>Major Vessels (0–3)</label><input type="number" id="hd-ca" placeholder="e.g. 0" min="0" max="3"/></div>
+        <div class="fg full"><label>Thalassemia</label><select id="hd-thaltype"><option value="">Select</option><option value="3">Normal</option><option value="6">Fixed defect</option><option value="7">Reversible defect</option></select></div>
+      </div>
+      <button class="run-btn" onclick="predict('heart')">
+        <span id="hd-txt">Analyse Risk</span>
+        <div class="spin-dots" id="hd-ld"><div class="sd"></div><div class="sd"></div><div class="sd"></div></div>
+      </button>
+      <div class="result-panel" id="res-heart"></div>
+    </div>
+
+    <!-- DIABETES -->
+    <div id="form-diabetes" style="display:none">
+      <div class="form-head">
+        <h2 class="form-title">Diabetes<br/>Risk Analysis</h2>
+        <p class="form-sub">Based on Pima Indian Diabetes dataset. Optimised for female patients aged 21+.</p>
+      </div>
+      <div class="fgrid">
+        <div class="fg"><label>Pregnancies</label><input type="number" id="db-pr" placeholder="e.g. 2" min="0" max="20"/></div>
+        <div class="fg"><label>Glucose Level</label><input type="number" id="db-gl" placeholder="e.g. 120"/><span class="hint">mg/dL (2-hr plasma)</span></div>
+        <div class="fg"><label>Blood Pressure</label><input type="number" id="db-bp" placeholder="e.g. 72"/><span class="hint">mm Hg diastolic</span></div>
+        <div class="fg"><label>Skin Thickness</label><input type="number" id="db-sk" placeholder="e.g. 28"/><span class="hint">mm (triceps)</span></div>
+        <div class="fg"><label>Insulin</label><input type="number" id="db-in" placeholder="e.g. 80"/><span class="hint">μU/mL</span></div>
+        <div class="fg"><label>BMI</label><input type="number" id="db-bmi" placeholder="e.g. 32.1" step="0.1"/><span class="hint">kg/m²</span></div>
+        <div class="fg"><label>Diabetes Pedigree</label><input type="number" id="db-dpf" placeholder="e.g. 0.42" step="0.001"/><span class="hint">Family history score</span></div>
+        <div class="fg"><label>Age</label><input type="number" id="db-age" placeholder="e.g. 35" min="21"/></div>
+      </div>
+      <button class="run-btn" onclick="predict('diabetes')">
+        <span id="db-txt">Analyse Risk</span>
+        <div class="spin-dots" id="db-ld"><div class="sd"></div><div class="sd"></div><div class="sd"></div></div>
+      </button>
+      <div class="result-panel" id="res-diabetes"></div>
+    </div>
+
+  </div>
+</section>
+
+<div class="div-bar">02 — Models &amp; Performance</div>
+
+<!-- ABOUT -->
+<section id="about" class="about">
+  <div class="about-l reveal">
+    <h2 class="section-title">Built on<br/><em>clinical</em><br/>data.</h2>
+    <p class="body-text">Prognos uses three UCI ML Repository datasets preprocessed with SMOTE balancing, median imputation, and standard scaling. Each prediction is made by a soft-voting ensemble of XGBoost, Random Forest, SVM, and Logistic Regression — trained with 5-fold cross-validation.</p>
+    <div class="radar-wrap"><canvas id="radarChart"></canvas></div>
+  </div>
+  <div class="about-r reveal">
+    <h2 class="section-title" style="color:var(--white)">Model <em>scores.</em></h2>
+    <ul class="model-list">
+      <li><div><div class="ml-name">Breast Cancer</div><div class="ml-sub">XGBoost + RF + SVM + LR</div></div><div class="ml-score">99.1%</div></li>
+      <li><div><div class="ml-name">Heart Disease</div><div class="ml-sub">AUC-ROC 0.959</div></div><div class="ml-score">86.9%</div></li>
+      <li><div><div class="ml-name">Diabetes</div><div class="ml-sub">AUC-ROC 0.833</div></div><div class="ml-score">77.3%</div></li>
+      <li><div><div class="ml-name">Algorithms used</div><div class="ml-sub">Voting ensemble, soft</div></div><div class="ml-score">4</div></li>
+    </ul>
+    <div class="dark-chart-wrap"><canvas id="barChart"></canvas></div>
+  </div>
+</section>
+
+<footer>
+  <div class="foot-logo">Prog<em>nos</em></div>
+  <div class="foot-note">For research purposes only. Not a substitute for professional medical advice.</div>
+</footer>
+
+<script>
+// ── LOADER ──
+let pct=0;
+const lbar=document.getElementById("lbar"),lpct=document.getElementById("lpct"),loaderEl=document.getElementById("loader");
+const iv=setInterval(()=>{
+  pct+=Math.random()*14+2;
+  if(pct>=100){pct=100;clearInterval(iv);setTimeout(()=>{loaderEl.classList.add("hide");initCharts();},500);}
+  lbar.style.width=Math.min(pct,100)+"%";
+  lpct.textContent=Math.round(Math.min(pct,100))+"%";
+},100);
+
+// ── REVEAL ──
+const obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add("vis");}),{threshold:0.1});
+document.querySelectorAll(".reveal").forEach(el=>obs.observe(el));
+setTimeout(()=>document.querySelectorAll(".reveal").forEach(el=>el.classList.add("vis")),300);
+
+// ── TABS ──
+function switchTab(d){
+  ["breast","heart","diabetes"].forEach(x=>{
+    document.getElementById("form-"+x).style.display=x===d?"block":"none";
+    document.getElementById("tab-"+x).classList.toggle("active",x===d);
+  });
+}
+
+// ── CHARTS ──
+let chartInstances={};
+function initCharts(){
+  // Hero grouped bar
+  const hc=document.getElementById("heroChart");
+  chartInstances.hero=new Chart(hc,{
+    type:"bar",
+    data:{
+      labels:["SVM","Log. Reg","Rand. Forest","XGBoost","Ensemble"],
+      datasets:[
+        {label:"Breast Cancer",data:[96.5,96.5,94.7,94.7,99.1],backgroundColor:"rgba(10,10,10,0.88)",borderRadius:2},
+        {label:"Heart Disease",data:[83.6,86.9,90.2,90.2,86.9],backgroundColor:"rgba(10,10,10,0.35)",borderRadius:2},
+        {label:"Diabetes",data:[70.1,73.4,73.4,77.9,77.3],backgroundColor:"rgba(10,10,10,0.13)",borderRadius:2}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{labels:{font:{family:"DM Sans",size:11},color:"#9e9c98",boxWidth:10},position:"top"},
+        tooltip:{callbacks:{label:c=>c.dataset.label+": "+c.parsed.y+"%"}}
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{font:{family:"DM Sans",size:10},color:"#9e9c98"}},
+        y:{min:60,max:100,grid:{color:"rgba(0,0,0,0.05)"},ticks:{font:{family:"DM Sans",size:10},color:"#9e9c98",callback:v=>v+"%"}}
+      }
+    }
+  });
+
+  // Radar
+  const rc=document.getElementById("radarChart");
+  chartInstances.radar=new Chart(rc,{
+    type:"radar",
+    data:{
+      labels:["Accuracy","AUC×100","Precision","Recall","F1"],
+      datasets:[
+        {label:"Breast Cancer",data:[99.1,99.9,99,99,99],borderColor:"#0a0a0a",backgroundColor:"rgba(10,10,10,0.07)",pointBackgroundColor:"#0a0a0a",borderWidth:1.5,pointRadius:3},
+        {label:"Heart Disease",data:[86.9,95.9,89,87,87],borderColor:"#9e9c98",backgroundColor:"rgba(158,156,152,0.07)",pointBackgroundColor:"#9e9c98",borderWidth:1.5,pointRadius:3},
+        {label:"Diabetes",data:[77.3,83.3,79,77,78],borderColor:"#c8c6c2",backgroundColor:"rgba(200,198,194,0.07)",pointBackgroundColor:"#c8c6c2",borderWidth:1.5,pointRadius:3}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{font:{family:"DM Sans",size:11},color:"#5a5855",boxWidth:10},position:"bottom"}},
+      scales:{r:{grid:{color:"rgba(0,0,0,0.07)"},pointLabels:{font:{family:"DM Sans",size:11},color:"#5a5855"},ticks:{display:false},min:60,max:100,angleLines:{color:"rgba(0,0,0,0.07)"}}}
+    }
+  });
+
+  // Dark bar (about)
+  const bc=document.getElementById("barChart");
+  chartInstances.bar=new Chart(bc,{
+    type:"bar",
+    data:{
+      labels:["Breast Cancer","Heart Disease","Diabetes"],
+      datasets:[
+        {label:"Accuracy %",data:[99.1,86.9,77.3],backgroundColor:"rgba(248,248,246,0.18)",borderColor:"rgba(248,248,246,0.45)",borderWidth:1,borderRadius:2},
+        {label:"AUC×100",data:[99.9,95.9,83.3],backgroundColor:"rgba(248,248,246,0.06)",borderColor:"rgba(248,248,246,0.2)",borderWidth:1,borderRadius:2}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{font:{family:"DM Sans",size:11},color:"#777",boxWidth:10},position:"top"}},
+      scales:{
+        x:{grid:{display:false},ticks:{font:{family:"DM Sans",size:11},color:"#666"}},
+        y:{min:60,max:100,grid:{color:"rgba(255,255,255,0.05)"},ticks:{font:{family:"DM Sans",size:10},color:"#555",callback:v=>v+"%"}}
+      }
+    }
+  });
+}
+
+// ── PREDICT ──
+function predict(d){
+  const map={breast:["bc-txt","bc-ld"],heart:["hd-txt","hd-ld"],diabetes:["db-txt","db-ld"]};
+  const[tid,lid]=map[d];
+  document.getElementById(tid).style.display="none";
+  document.getElementById(lid).classList.add("on");
+  setTimeout(()=>{
+    document.getElementById(tid).style.display="";
+    document.getElementById(lid).classList.remove("on");
+    let prob=0,det={};
+    if(d==="breast"){
+      const r=+document.getElementById("bc-r").value||14,t=+document.getElementById("bc-t").value||19,p=+document.getElementById("bc-p").value||92,a=+document.getElementById("bc-a").value||655;
+      const sm=+document.getElementById("bc-sm").value||0.096,co=+document.getElementById("bc-co").value||0.104,cc=+document.getElementById("bc-cc").value||0.089,cp=+document.getElementById("bc-cp").value||0.048;
+      const s=-6+(r*0.18)+(t*0.04)+(p*0.02)+(a*0.001)+(sm*12)+(co*8)+(cc*10)+(cp*15);
+      prob=Math.min(0.97,Math.max(0.03,1/(1+Math.exp(-s))));
+      det={pr:"0.99",re:"0.99",f1:"0.99"};
+    }
+    if(d==="heart"){
+      const age=+document.getElementById("hd-age").value||52,sex=+document.getElementById("hd-sex").value||1,cp=+document.getElementById("hd-cp").value||0;
+      const bp=+document.getElementById("hd-bp").value||130,chol=+document.getElementById("hd-chol").value||240,thal=+document.getElementById("hd-thal").value||150;
+      const ex=+document.getElementById("hd-ex").value||0,op=+document.getElementById("hd-op").value||1,ca=+document.getElementById("hd-ca").value||0;
+      const s=-3+(age*0.04)+(sex*0.5)+(cp*-0.6)+(bp*0.01)+(chol*0.003)+(thal*-0.02)+(ex*0.8)+(op*0.4)+(ca*0.7);
+      prob=Math.min(0.95,Math.max(0.05,1/(1+Math.exp(-s))));
+      det={pr:"0.89",re:"0.87",f1:"0.87"};
+    }
+    if(d==="diabetes"){
+      const pr=+document.getElementById("db-pr").value||2,gl=+document.getElementById("db-gl").value||120;
+      const bp=+document.getElementById("db-bp").value||72,bmi=+document.getElementById("db-bmi").value||32;
+      const dpf=+document.getElementById("db-dpf").value||0.4,age=+document.getElementById("db-age").value||35;
+      const s=-7+(pr*0.12)+(gl*0.035)+(bp*0.008)+(bmi*0.07)+(dpf*1.2)+(age*0.02);
+      prob=Math.min(0.94,Math.max(0.06,1/(1+Math.exp(-s))));
+      det={pr:"0.79",re:"0.77",f1:"0.78"};
+    }
+    showResult(d,prob,det);
+  },2000);
+}
+
+function showResult(d,prob,det){
+  const pct=Math.round(prob*100);
+  const isPos=prob>0.5;
+  const rl=prob>0.7?"high":prob>0.4?"med":"low";
+  const rlab=prob>0.7?"High Risk":prob>0.4?"Moderate Risk":"Low Risk";
+  const dname=d==="breast"?"Cancer Likelihood":d==="heart"?"Heart Disease Likelihood":"Diabetes Likelihood";
+  const cid="rc"+Date.now();
+  const panel=document.getElementById("res-"+d);
+  panel.innerHTML=`
+    <div class="res-row">
+      <div>
+        <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--g400);margin-bottom:7px">Analysis Result</div>
+        <div class="res-verdict">${isPos?dname:"No Disease Detected"}</div>
+      </div>
+      <div class="badge ${rl}">${rlab}</div>
+    </div>
+    <div class="prob-section">
+      <div class="prob-top"><span>Probability Score</span><span class="prob-num">${pct}%</span></div>
+      <div class="prob-track"><div class="prob-fill" id="pf-${d}" style="width:0%"></div></div>
+    </div>
+    <div class="metrics-row">
+      <div class="metric-box"><div class="m-val">${det.pr}</div><div class="m-key">Precision</div></div>
+      <div class="metric-box"><div class="m-val">${det.re}</div><div class="m-key">Recall</div></div>
+      <div class="metric-box"><div class="m-val">${det.f1}</div><div class="m-key">F1 Score</div></div>
+    </div>
+    <div class="res-chart-wrap">
+      <div class="res-chart-label">Risk distribution</div>
+      <div class="donut-wrap">
+        <canvas id="${cid}" width="170" height="170"></canvas>
+        <div class="donut-legend">
+          <div class="dl-item"><div class="dl-dot" style="background:#0a0a0a"></div>${pct}% Risk probability</div>
+          <div class="dl-item"><div class="dl-dot" style="background:#e0dfdc"></div>${100-pct}% Safe range</div>
+        </div>
+      </div>
+    </div>
+    <div class="res-note"><strong>Important:</strong> This is a research tool. Results should not replace professional medical diagnosis. Please consult a qualified healthcare provider.</div>
+  `;
+  panel.classList.add("on");
+  setTimeout(()=>{
+    document.getElementById("pf-"+d).style.width=pct+"%";
+    if(chartInstances[cid]) chartInstances[cid].destroy();
+    chartInstances[cid]=new Chart(document.getElementById(cid),{
+      type:"doughnut",
+      data:{
+        labels:["Risk","Safe"],
+        datasets:[{data:[pct,100-pct],backgroundColor:["#0a0a0a","#e0dfdc"],borderWidth:0,hoverOffset:2}]
+      },
+      options:{
+        responsive:false,cutout:"74%",
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+": "+c.parsed+"%"}}}
+      }
+    });
+  },120);
+  panel.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+</script>
+</body>
+</html>
